@@ -32,7 +32,8 @@ target_sources( ${PROJECT_NAME}
     PUBLIC
     "init_module.cpp"
     "count.h"
-    "worker_py.h"
+    "enable_shared_from_this.h"
+    "worker.h"
     )
 
 AddClangFormat(${PROJECT_NAME})
