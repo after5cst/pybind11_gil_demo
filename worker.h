@@ -1,184 +1,140 @@
-//#include "include_pybind11.h"
 #include "enable_shared_from_this.h"
 
-class base_worker : public enable_shared_from_this<base_worker>
+#include <assert.h>
+#include <atomic>
+#include <future>
+
+namespace worker
 {
-public:
-    typedef std::shared_ptr<base_worker> pointer_t;
-    typedef count::input_t input_t;
-    typedef count::output_t output_t;
-    typedef std::shared_ptr<output_t> output_ptr_t;
-
-    output_ptr_t start()
+    enum class state
     {
-        m_output = std::make_shared<output_t>();
-        m_output->last = m_input.start;
+        not_started,
+        setup,
+        running,
+        teardown,
+        passed,
+        failed
+    };
 
-        m_output->future = really_async(
-            [](pointer_t shared_this) { return shared_this->execute(); },
-            shared_from_this());
-
-        return m_output;
-    }
-
-    worker::state get_state() const
+    struct output_t
     {
-        return m_output ? worker::state{m_output->state}
-                        : worker::state::not_started;
-    }
-
-    void abort() { m_keep_going = false; }
-
-protected:
-    void set_state(worker::state state)
+        std::future<worker::state> future;
+        std::atomic<worker::state> state;
+        output_t() : future(), state(worker::state::not_started) {}
+    };
+    template <typename INPUT_T, typename OUTPUT_T>
+    class base : public enable_shared_from_this<base<INPUT_T, OUTPUT_T>>
     {
-        if (m_output)
+        typedef enable_shared_from_this<base<INPUT_T, OUTPUT_T>> baseclass;
+
+    public:
+        typedef std::shared_ptr<base> pointer_t;
+        typedef INPUT_T input_t;
+        typedef OUTPUT_T output_t;
+        typedef std::shared_ptr<output_t> output_ptr_t;
+
+        output_ptr_t start()
         {
-            m_output->state = state;
-        }
-        else
-        {
-            throw std::runtime_error(
-                "State cannot be set: no memory allocation");
-        }
-    }
+            m_output = std::make_shared<output_t>();
+            m_output->last = m_input.start;
 
-    worker::state execute()
-    {
-        assert(nullptr != m_output);
-        if (worker::state::not_started != get_state())
-        {
-            // I assume that a worker can be executed only once.
-            // Otherwise, state and resource management gets more complicated.
-            return worker::state::failed;
+            m_output->future = really_async(
+                [](pointer_t shared_this) { return shared_this->execute(); },
+                baseclass::shared_from_this());
+
+            return m_output;
         }
 
-        if (m_keep_going)
+        worker::state get_state() const
         {
-            set_state(worker::state::setup);
-            if (!on_setup())
+            return m_output ? worker::state{m_output->state}
+                            : worker::state::not_started;
+        }
+
+        void abort() { m_keep_going = false; }
+
+    protected:
+        void set_state(worker::state state)
+        {
+            if (m_output)
             {
-                m_keep_going = false;
+                m_output->state = state;
+            }
+            else
+            {
+                throw std::runtime_error(
+                    "State cannot be set: no memory allocation");
             }
         }
 
-        if (m_keep_going)
+        worker::state execute()
         {
-            set_state(worker::state::running);
-            if (!on_running())
+            assert(nullptr != m_output);
+            if (worker::state::not_started != get_state())
             {
-                m_keep_going = false;
+                // I assume that a worker can be executed only once.
+                // Otherwise, state and resource management gets more
+                // complicated.
+                return worker::state::failed;
             }
-        }
 
-        // Regardless of whether execution is allowed, teardown must
-        // be performed.  Otherwise we might have resource leaks.
-        set_state(worker::state::teardown);
-        if (!on_teardown())
-        {
-            m_keep_going = false;
-        }
-
-        set_state(m_keep_going ? worker::state::passed : worker::state::failed);
-        return get_state();
-    }
-
-public:
-    base_worker(const count::input_t &input)
-        : m_input(input), m_output(), m_keep_going(true)
-    {
-    }
-    base_worker(const base_worker &two) = delete;
-    const base_worker &operator=(const base_worker &two) = delete;
-    virtual ~base_worker() = default;
-
-protected:
-    virtual bool on_setup() { return true; }
-    virtual bool on_running()
-    {
-        while (m_keep_going && m_output->last < m_input.end)
-        {
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds(m_input.delay_ms));
-            ++m_output->last;
-        }
-        return true;
-    }
-    virtual bool on_teardown() { return true; }
-
-private:
-    const count::input_t m_input;
-    std::shared_ptr<count::output_t> m_output;
-    std::atomic<bool> m_keep_going;
-};
-
-#endif
-
-PYBIND11_MODULE(gild, module)
-{
-    module.doc() = R"pbdoc(
-          Proof of concept demo for threading with pybind11 and the GIL.
-      )pbdoc";
-
-    module.def("block_for_one_second", &block_for_one_second,
-               "Block Python for one second");
-    module.def("sleep_for_one_second", &sleep_for_one_second,
-               "Sleep this thread for one second");
-
-    pybind11::class_<count::input_t>(module, "CountInput")
-        .def(pybind11::init<>())
-        .def_readwrite("start", &count::input_t::start)
-        .def_readwrite("end", &count::input_t::end)
-        .def_readwrite("delay_ms", &count::input_t::delay_ms);
-
-    typedef std::shared_ptr<count::output_t> output_ptr_t;
-    pybind11::class_<count::output_t, output_ptr_t>(module, "CountOutput")
-        .def(pybind11::init<>())
-        .def_property_readonly(
-            "last", [](output_ptr_t arg) { return arg ? int{arg->last} : -1; });
-
-    typedef std::shared_ptr<base_worker> worker_ptr_t;
-    pybind11::class_<base_worker, worker_ptr_t>(module, "CountWorker")
-        .def(pybind11::init<count::input_t>())
-        .def("abort", &base_worker::abort)
-        .def("start", &base_worker::start)
-        .def_property_readonly("state", [](worker_ptr_t arg) {
-            if (arg)
-                switch (arg->get_state())
+            if (m_keep_going)
+            {
+                set_state(worker::state::setup);
+                if (!on_setup())
                 {
-                case worker::state::not_started:
-                    return "not started";
-                case worker::state::setup:
-                    return "setup";
-                case worker::state::running:
-                    return "running";
-                case worker::state::teardown:
-                    return "teardown";
-                case worker::state::passed:
-                    return "passed";
-                case worker::state::failed:
-                    return "failed";
+                    m_keep_going = false;
                 }
-            return "unknown";
-        });
+            }
 
-#ifdef JOJO
-#error WHAT AM I DOING WRONG -- STD::ATOMIC DOES SEEM TO WORK!
+            if (m_keep_going)
+            {
+                set_state(worker::state::running);
+                if (!on_running())
+                {
+                    m_keep_going = false;
+                }
+            }
 
-    typedef worker::container<counter_worker, counter_input_t> counter_t;
-    pybind11::class_<counter_t>(module, "Worker")
-        .def(pybind11::init<const counter_input_t &>())
-        .def_property_readonly("state", &counter_t::get_state)
-        .def("start", &counter_t::start);
+            // Regardless of whether execution is allowed, teardown must
+            // be performed.  Otherwise we might have resource leaks.
+            set_state(worker::state::teardown);
+            if (!on_teardown())
+            {
+                m_keep_going = false;
+            }
 
-    pybind11::class_<std::atomic_flag>(module, "AtomicFlag")
-        .def(pybind11::init<>())
-        .def("clear",
-             [](std::atomic_flag &a) {
-                 a.clear();
-                 return 0;
-             })
-        .def("test_and_set",
-             [](std::atomic_flag &a) { return a.test_and_set(); });
-#endif
+            set_state(m_keep_going ? worker::state::passed
+                                   : worker::state::failed);
+            return get_state();
+        }
+
+    public:
+        base(const input_t &input)
+            : m_input(input), m_output(), m_keep_going(true)
+        {
+        }
+        base(const base &two) = delete;
+        const base &operator=(const base &two) = delete;
+        virtual ~base() = default;
+
+    protected:
+        virtual bool on_setup() { return true; }
+        virtual bool on_running()
+        {
+            while (m_keep_going && m_output->last < m_input.end)
+            {
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds(m_input.delay_ms));
+                ++m_output->last;
+            }
+            return true;
+        }
+        virtual bool on_teardown() { return true; }
+
+    private:
+        const input_t m_input;
+        std::shared_ptr<output_t> m_output;
+        std::atomic<bool> m_keep_going;
+    };
 }

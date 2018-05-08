@@ -1,3 +1,4 @@
+#include "worker.h"
 #include "count.h"
 #include "include_pybind11.h"
 
@@ -63,20 +64,7 @@ inline auto really_async(F &&f, Ts &&... params)
                       std::forward<Ts>(params)...);
 }
 
-#pragma GCC diagnostic push
-// Effective C++ (correctly) warns when a non-virtual destructor is
-// in the base class of one with a virtual destructor.  However, the
-// enable_shared_from_this *explicitly* is built for exactly this
-// behavior.  Disable the GCC warning for the duration of this class.
-#pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
-template <typename T>
-class enable_shared_from_this : public std::enable_shared_from_this<T>
-{
-public:
-    virtual ~enable_shared_from_this() = default;
-};
-#pragma GCC diagnostic pop
-
+/*
 class base_worker : public enable_shared_from_this<base_worker>
 {
 public:
@@ -187,6 +175,7 @@ private:
     std::shared_ptr<count::output_t> m_output;
     std::atomic<bool> m_keep_going;
 };
+*/
 
 #endif
 
@@ -213,11 +202,12 @@ PYBIND11_MODULE(gild, module)
         .def_property_readonly(
             "last", [](output_ptr_t arg) { return arg ? int{arg->last} : -1; });
 
-    typedef std::shared_ptr<base_worker> worker_ptr_t;
-    pybind11::class_<base_worker, worker_ptr_t>(module, "CountWorker")
+    typedef worker::base<count::input_t, count::output_t> worker_t;
+    typedef std::shared_ptr<worker_t> worker_ptr_t;
+    pybind11::class_<worker_t, worker_ptr_t>(module, "CountWorker")
         .def(pybind11::init<count::input_t>())
-        .def("abort", &base_worker::abort)
-        .def("start", &base_worker::start)
+        .def("abort", &worker_t::abort)
+        .def("start", &worker_t::start)
         .def_property_readonly("state", [](worker_ptr_t arg) {
             if (arg)
                 switch (arg->get_state())

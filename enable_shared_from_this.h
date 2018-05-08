@@ -3,7 +3,7 @@
 #include <memory>
 
 #pragma GCC diagnostic push
-/
+//
 // Effective C++ (correctly) warns when a non-virtual destructor is
 // in the base class of one with a virtual destructor.  However, the
 // enable_shared_from_this *explicitly* is built for exactly this

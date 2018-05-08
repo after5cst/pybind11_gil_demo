@@ -4,26 +4,6 @@
 #include <atomic>
 #include <future>
 
-namespace worker
-{
-    enum class state
-    {
-        not_started,
-        setup,
-        running,
-        teardown,
-        passed,
-        failed
-    };
-
-    struct output_t
-    {
-        std::future<worker::state> future;
-        std::atomic<worker::state> state;
-        output_t() : future(), state(worker::state::not_started) {}
-    };
-}
-
 namespace count
 {
     struct input_t
