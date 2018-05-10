@@ -1,4 +1,8 @@
+#ifndef WORKER_H
+#define WORKER_H
+
 #include "enable_shared_from_this.h"
+#include "include_pybind11.h"
 
 #include <assert.h>
 #include <atomic>
@@ -23,12 +27,12 @@ namespace worker
         output_t() : future(), state(worker::state::not_started) {}
     };
     template <typename INPUT_T, typename OUTPUT_T>
-    class base : public enable_shared_from_this<base<INPUT_T, OUTPUT_T>>
+    class Base : public enable_shared_from_this<Base<INPUT_T, OUTPUT_T>>
     {
-        typedef enable_shared_from_this<base<INPUT_T, OUTPUT_T>> baseclass;
+        typedef enable_shared_from_this<Base<INPUT_T, OUTPUT_T>> baseclass;
 
     public:
-        typedef std::shared_ptr<base> pointer_t;
+        typedef std::shared_ptr<Base> pointer_t;
         typedef INPUT_T input_t;
         typedef OUTPUT_T output_t;
         typedef std::shared_ptr<output_t> output_ptr_t;
@@ -109,32 +113,22 @@ namespace worker
             return get_state();
         }
 
-    public:
-        base(const input_t &input)
+        Base(const input_t &input)
             : m_input(input), m_output(), m_keep_going(true)
         {
         }
-        base(const base &two) = delete;
-        const base &operator=(const base &two) = delete;
-        virtual ~base() = default;
+        Base(const Base &two) = delete;
+        const Base &operator=(const Base &two) = delete;
+        virtual ~Base() = default;
 
-    protected:
         virtual bool on_setup() { return true; }
-        virtual bool on_running()
-        {
-            while (m_keep_going && m_output->last < m_input.end)
-            {
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(m_input.delay_ms));
-                ++m_output->last;
-            }
-            return true;
-        }
+        virtual bool on_running() { return true; }
         virtual bool on_teardown() { return true; }
 
-    private:
         const input_t m_input;
         std::shared_ptr<output_t> m_output;
         std::atomic<bool> m_keep_going;
     };
 }
+
+#endif // WORKER_H

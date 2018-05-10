@@ -1,9 +1,8 @@
-#include "really_async.h"
 #include "worker.h"
 #include "count.h"
-#include "include_pybind11.h"
 
-#include <assert.h>
+#include "really_async.h"
+
 #include <chrono>
 #include <iostream>
 #include <stdio.h>
@@ -57,7 +56,7 @@ PYBIND11_MODULE(gild, module)
         .def_property_readonly(
             "last", [](output_ptr_t arg) { return arg ? int{arg->last} : -1; });
 
-    typedef worker::base<count::input_t, count::output_t> worker_t;
+    typedef count::Worker worker_t;
     typedef std::shared_ptr<worker_t> worker_ptr_t;
     pybind11::class_<worker_t, worker_ptr_t>(module, "CountWorker")
         .def(pybind11::init<count::input_t>())
@@ -82,24 +81,4 @@ PYBIND11_MODULE(gild, module)
                 }
             return "unknown";
         });
-
-#ifdef JOJO
-#error WHAT AM I DOING WRONG -- STD::ATOMIC DOES SEEM TO WORK!
-
-    typedef worker::container<counter_worker, counter_input_t> counter_t;
-    pybind11::class_<counter_t>(module, "Worker")
-        .def(pybind11::init<const counter_input_t &>())
-        .def_property_readonly("state", &counter_t::get_state)
-        .def("start", &counter_t::start);
-
-    pybind11::class_<std::atomic_flag>(module, "AtomicFlag")
-        .def(pybind11::init<>())
-        .def("clear",
-             [](std::atomic_flag &a) {
-                 a.clear();
-                 return 0;
-             })
-        .def("test_and_set",
-             [](std::atomic_flag &a) { return a.test_and_set(); });
-#endif
 }

@@ -8,7 +8,6 @@ import unittest
 
 class TestReleaseGIL(unittest.TestCase):
 
-
     def test_sleep(self):
         """
         Ensure that keeping the GIL blocks other threads.
@@ -26,10 +25,6 @@ class TestReleaseGIL(unittest.TestCase):
 
         self.assertGreaterEqual(elapsed, 1.0)
         self.assertLess(elapsed, 2.0)
-
-    def test_worker(self):
-        start_worker()
-
 
 
 if __name__ == '__main__':

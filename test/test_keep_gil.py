@@ -4,9 +4,7 @@ import threading
 import timeit
 import unittest
 
-
 class TestKeepGIL(unittest.TestCase):
-
 
     def test_block(self):
         """
