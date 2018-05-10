@@ -14,25 +14,25 @@ namespace worker
     {
         not_started,
         setup,
-        running,
+        working,
         teardown,
-        passed,
-        failed
+        complete,
+        incomplete
     };
 
-    struct output_t
+    struct runnable_output
     {
         std::future<worker::state> future;
         std::atomic<worker::state> state;
-        output_t() : future(), state(worker::state::not_started) {}
+        runnable_output() : future(), state(worker::state::not_started) {}
     };
     template <typename INPUT_T, typename OUTPUT_T>
-    class Base : public enable_shared_from_this<Base<INPUT_T, OUTPUT_T>>
+    class runnable : public enable_shared_from_this<runnable<INPUT_T, OUTPUT_T>>
     {
-        typedef enable_shared_from_this<Base<INPUT_T, OUTPUT_T>> baseclass;
+        typedef enable_shared_from_this<runnable<INPUT_T, OUTPUT_T>> baseclass;
 
     public:
-        typedef std::shared_ptr<Base> pointer_t;
+        typedef std::shared_ptr<runnable> pointer_t;
         typedef INPUT_T input_t;
         typedef OUTPUT_T output_t;
         typedef std::shared_ptr<output_t> output_ptr_t;
@@ -43,7 +43,7 @@ namespace worker
             m_output->last = m_input.start;
 
             m_output->future = really_async(
-                [](pointer_t shared_this) { return shared_this->execute(); },
+                [](pointer_t shared_this) { return shared_this->run(); },
                 baseclass::shared_from_this());
 
             return m_output;
@@ -71,7 +71,24 @@ namespace worker
             }
         }
 
-        worker::state execute()
+        runnable(const input_t &input)
+            : m_input(input), m_output(), m_keep_going(true)
+        {
+        }
+        runnable(const runnable &two) = delete;
+        const runnable &operator=(const runnable &two) = delete;
+        virtual ~runnable() = default;
+
+        virtual bool on_setup() { return true; }
+        virtual bool on_working() { return true; }
+        virtual bool on_teardown() { return true; }
+
+        const input_t m_input;
+        std::shared_ptr<output_t> m_output;
+        std::atomic<bool> m_keep_going;
+
+    private:
+        worker::state run()
         {
             assert(nullptr != m_output);
             if (worker::state::not_started != get_state())
@@ -79,7 +96,7 @@ namespace worker
                 // I assume that a worker can be executed only once.
                 // Otherwise, state and resource management gets more
                 // complicated.
-                return worker::state::failed;
+                return worker::state::incomplete;
             }
 
             if (m_keep_going)
@@ -93,8 +110,8 @@ namespace worker
 
             if (m_keep_going)
             {
-                set_state(worker::state::running);
-                if (!on_running())
+                set_state(worker::state::working);
+                if (!on_working())
                 {
                     m_keep_going = false;
                 }
@@ -108,26 +125,10 @@ namespace worker
                 m_keep_going = false;
             }
 
-            set_state(m_keep_going ? worker::state::passed
-                                   : worker::state::failed);
+            set_state(m_keep_going ? worker::state::complete
+                                   : worker::state::incomplete);
             return get_state();
         }
-
-        Base(const input_t &input)
-            : m_input(input), m_output(), m_keep_going(true)
-        {
-        }
-        Base(const Base &two) = delete;
-        const Base &operator=(const Base &two) = delete;
-        virtual ~Base() = default;
-
-        virtual bool on_setup() { return true; }
-        virtual bool on_running() { return true; }
-        virtual bool on_teardown() { return true; }
-
-        const input_t m_input;
-        std::shared_ptr<output_t> m_output;
-        std::atomic<bool> m_keep_going;
     };
 }
 

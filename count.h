@@ -5,7 +5,7 @@
 
 namespace count
 {
-    struct input_t
+    struct count_input
     {
         int start = 0;
         int end = 100;
@@ -13,38 +13,38 @@ namespace count
 
         static void init_pybind11(pybind11::module &module)
         {
-            pybind11::class_<count::input_t>(module, "CountInput")
+            pybind11::class_<count::count_input>(module, "CountInput")
                 .def(pybind11::init<>())
-                .def_readwrite("start", &count::input_t::start)
-                .def_readwrite("end", &count::input_t::end)
-                .def_readwrite("delay_ms", &count::input_t::delay_ms);
+                .def_readwrite("start", &count::count_input::start)
+                .def_readwrite("end", &count::count_input::end)
+                .def_readwrite("delay_ms", &count::count_input::delay_ms);
         }
     };
 
-    struct output_t : public worker::output_t
+    struct count_output : public worker::runnable_output
     {
         std::atomic<int> last;
-        output_t() : worker::output_t(), last(0) {}
+        count_output() : worker::runnable_output(), last(0) {}
 
         static void init_pybind11(pybind11::module &module)
         {
-            pybind11::class_<count::input_t>(module, "CountInput")
+            pybind11::class_<count::count_input>(module, "CountOutput")
                 .def(pybind11::init<>())
-                .def_readwrite("start", &count::input_t::start)
-                .def_readwrite("end", &count::input_t::end)
-                .def_readwrite("delay_ms", &count::input_t::delay_ms);
+                .def_readwrite("start", &count::count_input::start)
+                .def_readwrite("end", &count::count_input::end)
+                .def_readwrite("delay_ms", &count::count_input::delay_ms);
         }
     };
 
-    class Worker : public worker::Base<input_t, output_t>
+    class runnable : public worker::runnable<count_input, count_output>
     {
-        typedef worker::Base<input_t, output_t> baseclass;
+        typedef worker::runnable<count_input, count_output> baseclass;
 
     public:
-        Worker(const input_t &input) : baseclass(input) {}
+        runnable(const input_t &input) : baseclass(input) {}
 
     protected:
-        virtual bool on_running() override
+        virtual bool on_working() override
         {
             while (m_keep_going && m_output->last < m_input.end)
             {

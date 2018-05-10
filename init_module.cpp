@@ -44,22 +44,22 @@ PYBIND11_MODULE(gild, module)
     module.def("sleep_for_one_second", &sleep_for_one_second,
                "Sleep this thread for one second");
 
-    pybind11::class_<count::input_t>(module, "CountInput")
+    pybind11::class_<count::count_input>(module, "CountInput")
         .def(pybind11::init<>())
-        .def_readwrite("start", &count::input_t::start)
-        .def_readwrite("end", &count::input_t::end)
-        .def_readwrite("delay_ms", &count::input_t::delay_ms);
+        .def_readwrite("start", &count::count_input::start)
+        .def_readwrite("end", &count::count_input::end)
+        .def_readwrite("delay_ms", &count::count_input::delay_ms);
 
-    typedef std::shared_ptr<count::output_t> output_ptr_t;
-    pybind11::class_<count::output_t, output_ptr_t>(module, "CountOutput")
+    typedef std::shared_ptr<count::count_output> output_ptr_t;
+    pybind11::class_<count::count_output, output_ptr_t>(module, "CountOutput")
         .def(pybind11::init<>())
         .def_property_readonly(
             "last", [](output_ptr_t arg) { return arg ? int{arg->last} : -1; });
 
-    typedef count::Worker worker_t;
+    typedef count::runnable worker_t;
     typedef std::shared_ptr<worker_t> worker_ptr_t;
     pybind11::class_<worker_t, worker_ptr_t>(module, "CountWorker")
-        .def(pybind11::init<count::input_t>())
+        .def(pybind11::init<count::count_input>())
         .def("abort", &worker_t::abort)
         .def("start", &worker_t::start)
         .def_property_readonly("state", [](worker_ptr_t arg) {
@@ -70,14 +70,14 @@ PYBIND11_MODULE(gild, module)
                     return "not started";
                 case worker::state::setup:
                     return "setup";
-                case worker::state::running:
-                    return "running";
+                case worker::state::working:
+                    return "working";
                 case worker::state::teardown:
                     return "teardown";
-                case worker::state::passed:
-                    return "passed";
-                case worker::state::failed:
-                    return "failed";
+                case worker::state::complete:
+                    return "complete";
+                case worker::state::incomplete:
+                    return "incomplete";
                 }
             return "unknown";
         });
