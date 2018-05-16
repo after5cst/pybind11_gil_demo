@@ -1,5 +1,4 @@
 from gild import sleep_for_one_second
-from gild import start_worker
 
 import threading
 import timeit

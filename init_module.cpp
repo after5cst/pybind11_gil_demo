@@ -1,5 +1,4 @@
-#include "worker.h"
-#include "count.h"
+#include "worker/control.h"
 
 #include "really_async.h"
 
@@ -33,6 +32,29 @@ void sleep_for_one_second()
     // std::cout << "Guard about to aquire" << std::endl;
 }
 
+worker::control minimal_worker_example(bool report_success, int sleep_ms)
+{
+    worker::control temp;
+    temp.future = really_async(
+        [](std::shared_ptr<worker::state> state, bool report_success,
+           int sleep_ms) {
+            *state = worker::state::setup;
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+            *state = worker::state::working;
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+            *state = worker::state::teardown;
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+            *state = report_success ? worker::state::complete
+                                    : worker::state::incomplete;
+        },
+        temp.state, report_success, sleep_ms);
+    while (worker::state::not_started == *temp.state)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return std::move(temp);
+}
+
 PYBIND11_MODULE(gild, module)
 {
     module.doc() = R"pbdoc(
@@ -43,7 +65,14 @@ PYBIND11_MODULE(gild, module)
                "Block Python for one second");
     module.def("sleep_for_one_second", &sleep_for_one_second,
                "Sleep this thread for one second");
+    module.def("minimal_worker_example", &minimal_worker_example,
+               "One-second example worker",
+               pybind11::arg("report_success") = true,
+               pybind11::arg("sleep_ms") = 100);
 
+    worker::control::bind(module);
+
+#if 0 // MOJO_JOJO
     pybind11::class_<count::count_input>(module, "CountInput")
         .def(pybind11::init<>())
         .def_readwrite("start", &count::count_input::start)
@@ -81,4 +110,5 @@ PYBIND11_MODULE(gild, module)
                 }
             return "unknown";
         });
+#endif
 }

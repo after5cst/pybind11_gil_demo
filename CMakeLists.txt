@@ -19,10 +19,7 @@ include_directories(${CMAKE_CURRENT_LIST_DIR})
 #----------------------------------------------------------
 # Step 3: Add reusable sources and subdirectories.
 
-#include(discover/discover.cmake)
-#include(nvme/nvme.cmake)
-#include(pcie/pcie.cmake)
-#include(power/power.cmake)
+include(worker/worker.cmake)
 
 #----------------------------------------------------------
 # Step 4: Add the module initialization file.  There can
