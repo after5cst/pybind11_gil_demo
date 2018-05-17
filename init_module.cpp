@@ -1,4 +1,4 @@
-#include "worker/control.h"
+#include "count.h"
 
 #include "really_async.h"
 
@@ -27,9 +27,13 @@ void block_for_one_second()
 void sleep_for_one_second()
 {
     pybind11::gil_scoped_release guard_;
-    // std::cout << "Guard released" << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    // std::cout << "Guard about to aquire" << std::endl;
+}
+
+pybind11::object launch(worker::input *input)
+{
+    // std::move(pybind11::none());
+    return std::move(input->create_worker());
 }
 
 worker::control minimal_worker_example(bool report_success, int sleep_ms)
@@ -58,19 +62,83 @@ worker::control minimal_worker_example(bool report_success, int sleep_ms)
 PYBIND11_MODULE(gild, module)
 {
     module.doc() = R"pbdoc(
-          Proof of concept demo for threading with pybind11 and the GIL.
-      )pbdoc";
+Proof of concept demo for threading with pybind11 and the GIL.
+-----------------------
+.. currentmodule:: gild
+.. autosummary::
+   :toctree: _generate
 
-    module.def("block_for_one_second", &block_for_one_second,
-               "Block Python for one second");
-    module.def("sleep_for_one_second", &sleep_for_one_second,
-               "Sleep this thread for one second");
-    module.def("minimal_worker_example", &minimal_worker_example,
-               "One-second example worker",
+    block_for_one_second
+    sleep_for_one_second
+    minimal_worker_example
+)pbdoc";
+
+    module.def("block_for_one_second", &block_for_one_second, R"pbdoc(
+Demonstrate that if the GIL is not released, a C++ function
+will block Python from doing anything else (including other
+C++ methods) until the function is complete.
+
+Parameters
+----------
+None
+
+Returns
+----------
+None
+)pbdoc");
+
+    module.def("sleep_for_one_second", &sleep_for_one_second, R"pbdoc(
+Demonstrate that if the GIL is released, other Python
+threads can continue to run while the C++ code continues
+to keep the calling Python thread 'busy'.
+
+Parameters
+----------
+None
+
+Returns
+----------
+None
+)pbdoc");
+
+    module.def("minimal_worker_example", &minimal_worker_example, R"pbdoc(
+Demonstrate that C++ can launch a worker thread and return
+to Python, and that Python can then call and check on the
+status of that worker.
+
+Parameters
+----------
+report_success : if true, the worker will report it succeeded
+                 at the task it was performing.  Otherwise, it
+                 will return false.  Default: true.
+
+sleep_ms       : Number of milliseconds to sleep between stages
+                 of the worker (a total of three times).
+                 Default: 100 ms.
+
+Returns
+----------
+A Control() object, which can be queried for the status
+of the worker.)pbdoc",
                pybind11::arg("report_success") = true,
                pybind11::arg("sleep_ms") = 100);
 
+    module.def("launch", &launch, R"pbdoc(
+Launch a worker object to perform work in a C++ thread.  The
+type of worker object depends on the type of input object
+provided.
+
+Returns
+----------
+The related worker object.)pbdoc",
+               pybind11::arg("input"));
+
     worker::control::bind(module);
+    worker::input::bind(module);
+
+    count::input::bind(module);
+    count::output::bind(module);
+    count::worker_class::bind(module, "CountWorker");
 
 #if 0 // MOJO_JOJO
     pybind11::class_<count::count_input>(module, "CountInput")

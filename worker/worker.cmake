@@ -8,5 +8,6 @@ target_sources("${PROJECT_NAME}"
     "${HERE}/output.h"
     "${HERE}/runnable.h"
     "${HERE}/state.h"
+    "${HERE}/worker.h"
     )
 

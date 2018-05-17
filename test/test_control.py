@@ -14,7 +14,8 @@ class TestControl(unittest.TestCase):
         """
         c = Control()
         self.assertEqual(c.finished, False)
-        self.assertEqual(c.result, False)
+        # Since we never started, the result is failed (False)
+        self.assertEqual(c.wait_for_result(), False)
 
     def test_can_watch_state_changes(self):
         """
@@ -23,6 +24,7 @@ class TestControl(unittest.TestCase):
         with reasonable performance.  This can thrash a CPU,
         but it's only for a few seconds.
         """
+        start_time = timeit.default_timer()
         c = minimal_worker_example(sleep_ms=1000)
         self.assertEqual(c.finished, False)
         while "not started" == c.state:
@@ -37,7 +39,10 @@ class TestControl(unittest.TestCase):
         while "teardown" == c.state:
             pass
         self.assertEqual(c.state, "complete")
-        self.assertEqual(True, c.result)
+        self.assertEqual(True, c.wait_for_result())
+        elapsed = timeit.default_timer() - start_time
+        self.assertGreaterEqual(elapsed, 3.0)
+        self.assertLessEqual(elapsed, 4.0)
 
     def test_result_waits_until_ready(self):
         """
@@ -46,7 +51,7 @@ class TestControl(unittest.TestCase):
         """
         start_time = timeit.default_timer()
         c = minimal_worker_example()
-        self.assertEqual(True, c.result)
+        self.assertEqual(True, c.wait_for_result())
         elapsed = timeit.default_timer() - start_time
         self.assertGreaterEqual(elapsed, 0.3)
 
@@ -56,7 +61,16 @@ class TestControl(unittest.TestCase):
         can return a failed value.
         """
         c = minimal_worker_example(report_success=False)
-        self.assertEqual(False, c.result)
+        self.assertEqual(False, c.wait_for_result())
+
+    def test_result_can_timeout(self):
+        """
+        Demonstrate the timeout value can be exceeded
+        while waiting on a worker.
+        """
+        c = minimal_worker_example(sleep_ms=1000)
+        self.assertEqual(False, c.wait_for_result(timeout_in_seconds=1))
+        self.assertEqual(True, c.wait_for_result(timeout_in_seconds=3))
 
     def test_destructor_waits(self):
         """

@@ -23,13 +23,20 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // ------------------------------------------------------------------
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
 #include "pybind11/chrono.h"
+#pragma GCC diagnostic pop
 #include "./state.h"
+
+#include <atomic>
+#include <chrono>
+#include <mutex>
 
 namespace worker
 {
-
-    typedef std::atomic<std::chrono::time_point> thread_safe_time_point;
+    typedef std::chrono::steady_clock clock_t;
+    typedef std::atomic<clock_t::time_point> time_point_t;
 
     ///
     /// @brief The base output struct
@@ -61,45 +68,35 @@ namespace worker
         ///
         /// \return The elapsed time.
         ///
-        std::chrono::duration elapsed() const
+        clock_t::duration elapsed() const
         {
-            switch (runnable_state)
+            auto result = clock_t::duration::zero();
+            const auto epoch = clock_t::time_point{};
+            auto start = clock_t::time_point{start_run};
+            if (epoch != start)
             {
-            case state::not_started:
-            case state::setup:
-                break;
-            case state::working:
-                return std::chrono::steady_clock::now() - start_run;
-            // no break needed, return called
-            case state::teardown:
-            case state::complete:
-            case state::incomplete:
-                return end_run - start_run;
-                // no break needed, return called
+                auto end = clock_t::time_point{end_run};
+                if (end == epoch)
+                {
+                    end = clock_t::now();
+                }
+                result = end - start;
             }
-            return std::chrono::duration::zero();
+            return result;
         }
 
         /// @brief The start time for the related runnable::run().
-        thread_safe_time_point start_run;
+        time_point_t start_run = {clock_t::time_point{}};
         /// @brief The end time for the related runnable::run().
-        thread_safe_time_point end_run;
+        time_point_t end_run = {clock_t::time_point{}};
 
-        std::atomic<state> runnable_state;
-
-#if 0 // DOESN'T BELONG HERE -- NEED TO MOVE (TODO)
-#include <future>
-    /// @brief The end pass/fail from the related the runnable::run() function.
-    ///
-    /// See C++ documentation of std::async and std::future to understand
-    /// the potential blocking scenarios if called.
-    ///
-    /// The problematic C++ behavior of blocking when the future goes
-    /// out of scope here is avoided because the runnable will
-    /// get a shared pointer to this structure, so the future cannot
-    /// go out of scope until the runnable is complete.
-    std::future<bool> future;
-#endif
+        // pybind11 helpers to create Python wrapper object.
+        template <typename PARENT_CLASS>
+        static void
+        bind(pybind11::class_<PARENT_CLASS, std::shared_ptr<PARENT_CLASS>> &obj)
+        {
+            obj.def_property_readonly("elapsed", &PARENT_CLASS::elapsed);
+        }
     };
 
 } // end namespace worker

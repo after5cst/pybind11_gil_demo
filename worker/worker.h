@@ -1,5 +1,5 @@
-#ifndef WORKER_INPUT_H
-#define WORKER_INPUT_H
+#ifndef WORKER_WORKER_H
+#define WORKER_WORKER_H
 // ------------------------------------------------------------------
 // MIT License
 //
@@ -24,28 +24,39 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // ------------------------------------------------------------------
 #include "include_pybind11.h"
+#include "./control.h"
 
 namespace worker
 {
+    class runnable;
 
-    ///
-    /// \brief The base input struct
-    ///
-    struct input
+    template <typename INPUT_T, typename OUTPUT_T>
+    struct worker : public control
     {
-        virtual ~input() = default;
-        virtual pybind11::object create_worker() = 0;
+        typedef INPUT_T input_t;
+        typedef std::shared_ptr<OUTPUT_T> output_ptr_t;
+        typedef worker<INPUT_T, OUTPUT_T> worker_t;
+
+        input_t input = {};
+        output_ptr_t output = {};
 
         // pybind11 helpers to create Python wrapper object.
-        typedef pybind11::class_<input> class_t;
+        typedef worker container;
+        typedef pybind11::class_<container, std::shared_ptr<container>>
+            shared_class;
 
-        static pybind11::module &bind(pybind11::module &module)
+        static pybind11::module &bind(pybind11::module &module,
+                                      const char *object_name)
         {
-            class_t obj(module, "WorkerInput");
+            shared_class obj(module, object_name);
+            obj.def(pybind11::init<>());
+            control::bind(obj);
+            obj.def_readonly("input", &container::input);
+            obj.def_readonly("output", &container::output);
             return module;
         }
     };
 
 } // end namespace worker
 
-#endif // WORKER_INPUT_H
+#endif // WORKER_WORKER_H

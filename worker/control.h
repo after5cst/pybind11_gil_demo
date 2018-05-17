@@ -34,9 +34,14 @@ namespace worker
 {
     struct control
     {
-        std::future<void> future;
-        std::shared_ptr<worker::state> state;
+        std::future<void> future = std::future<void>();
+        std::shared_ptr<worker::state> state =
+            std::make_shared<worker::state>(worker::state::not_started);
 
+        /**
+         * @brief Return true if worker thread is finished and result is ready.
+         * @return true if result is ready, false otherwise.
+         */
         bool finished() const
         {
             if (nullptr == state)
@@ -61,7 +66,15 @@ namespace worker
             return result;
         }
 
-        bool join() const
+        /**
+         * @brief Wait for the worker to complete
+         * @param timeout_in_seconds The timeout value in seconds.
+         *        If this value is exceeded, the wait is abandoned
+         *        and false is returned.
+         * @return Return true if the worker is finished and the
+         *        task was completed, false otherwise.
+         */
+        bool wait_for_result(int timeout_in_seconds) const
         {
             if (nullptr == state)
             {
@@ -81,42 +94,39 @@ namespace worker
             case state::teardown:
             case state::complete:
             case state::incomplete:
-                future.wait();
-                result = (state::complete == *state);
-                break;
+                if (0 > timeout_in_seconds)
+                {
+                    // No timeout set, wait "forever"
+                    future.wait();
+                    result = (state::complete == *state);
+                }
+                else
+                {
+                    switch (future.wait_for(
+                        std::chrono::seconds(timeout_in_seconds)))
+                    {
+                    case std::future_status::ready:
+                        result = (state::complete == *state);
+                        break;
+                    case std::future_status::timeout:
+                        // We exhausted our wait time.  As a result, the
+                        // caller will have to try again and/or check
+                        // finished() to see what happened.  In any case,
+                        // we did not complete successfully in the window
+                        // given.
+                        break;
+                    case std::future_status::deferred:
+                        // IMPOSSIBLE if really_async was used.
+                        assert(false);
+                        // Still, if assertions aren't enabled, we report
+                        // that the worker didn't successfully finish.
+                        break;
+                    }
+                    break;
+                }
             }
             return result;
         }
-
-        // We want to automatically 'join' on destructor.  That requires
-        // that (by rule of five) we define not only the destructor, but
-        // all five (constructor, assignment constructor, assignment operator,
-        // move constructor, move assignment operator)
-
-        // Default constructor
-        control()
-            : future(),
-              state(std::make_shared<worker::state>(state::not_started))
-        {
-        }
-        control(const control &rhs) = delete;            // No copy constructor
-        control &operator=(const control &rhs) = delete; // No copy assignment
-        // Move constructor
-        control(control &&rhs)
-            : future(std::move(rhs.future)), state(std::move(rhs.state))
-        {
-        }
-        control &operator=(control &&rhs)
-        {
-            if (this != &rhs)
-            {
-                future = std::move(rhs.future);
-                state = std::move(rhs.state);
-            }
-            return *this;
-        }
-
-        ~control() { join(); }
 
         // pybind11 helpers to create Python wrapper object.
         typedef control container;
@@ -130,14 +140,14 @@ namespace worker
             return module;
         }
 
-        static class_ &bind(class_ &obj)
+        template <typename PARENT_CLASS> static void bind(PARENT_CLASS &obj)
         {
             obj.def_property_readonly("finished", &container::finished);
-            obj.def_property_readonly("result", &container::join);
+            obj.def("wait_for_result", &container::wait_for_result,
+                    pybind11::arg("timeout_in_seconds") = -1);
             obj.def_property_readonly("state", [](const control &arg) {
                 return worker::as_string(*arg.state);
             });
-            return obj;
         }
     };
 
