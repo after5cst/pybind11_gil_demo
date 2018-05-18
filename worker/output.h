@@ -91,11 +91,15 @@ namespace worker
         time_point_t end_run = {clock_t::time_point{}};
 
         // pybind11 helpers to create Python wrapper object.
-        template <typename PARENT_CLASS>
-        static void
-        bind(pybind11::class_<PARENT_CLASS, std::shared_ptr<PARENT_CLASS>> &obj)
+        typedef pybind11::class_<output> class_t;
+
+#error REMEMBER TO DEAL WITH INHERITANCE IN INPUT/OUTPUT/CONTROL
+        // OBJECTS.
+        static pybind11::module &bind(pybind11::module &module)
         {
-            obj.def_property_readonly("elapsed", &PARENT_CLASS::elapsed);
+            class_t obj(module, "WorkerOutput");
+            obj.def_property_readonly("elapsed", &output::elapsed);
+            return module;
         }
     };
 

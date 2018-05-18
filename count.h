@@ -15,9 +15,9 @@ namespace count
 
         // pybind11 helpers to create Python wrapper object.
         typedef output container;
-        typedef pybind11::class_<container, std::shared_ptr<container>>
+        typedef pybind11::class_<container, worker::output,
+                                 std::shared_ptr<container>>
             shared_class;
-        typedef worker::output baseclass;
 
         static pybind11::module &bind(pybind11::module &module)
         {
@@ -26,7 +26,6 @@ namespace count
             obj.def_property_readonly("last", [](const container &arg) {
                 return static_cast<int>(arg.last);
             });
-            baseclass::bind(obj);
             return module;
         }
     };
