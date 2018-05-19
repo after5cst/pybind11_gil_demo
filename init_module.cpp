@@ -1,6 +1,7 @@
 #include "count.h"
-
 #include "really_async.h"
+#include "worker/launch.h"
+#include "worker/job.h"
 
 #include <chrono>
 #include <iostream>
@@ -30,11 +31,7 @@ void sleep_for_one_second()
     std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-pybind11::object launch(worker::input *input)
-{
-    // std::move(pybind11::none());
-    return std::move(input->create_worker());
-}
+#ifdef MOJO_JOJO
 
 worker::control minimal_worker_example(bool report_success, int sleep_ms)
 {
@@ -58,6 +55,7 @@ worker::control minimal_worker_example(bool report_success, int sleep_ms)
     }
     return std::move(temp);
 }
+#endif // MOJO_JOJO
 
 PYBIND11_MODULE(gild, module)
 {
@@ -101,6 +99,15 @@ Returns
 None
 )pbdoc");
 
+    worker::bind_worker_input(module);
+    worker::bind_worker_job(module);
+    worker::bind_worker_launch(module);
+    worker::bind_worker_state(module);
+
+    count::input::bind(module);
+    count::output::bind(module);
+
+#ifdef MOJO_JOJO
     module.def("minimal_worker_example", &minimal_worker_example, R"pbdoc(
 Demonstrate that C++ can launch a worker thread and return
 to Python, and that Python can then call and check on the
@@ -140,7 +147,6 @@ The related worker object.)pbdoc",
     count::output::bind(module);
     count::worker_class::bind(module, "CountWorker");
 
-#if 0 // MOJO_JOJO
     pybind11::class_<count::count_input>(module, "CountInput")
         .def(pybind11::init<>())
         .def_readwrite("start", &count::count_input::start)

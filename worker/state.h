@@ -23,6 +23,7 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // ------------------------------------------------------------------
+#include "include_pybind11.h"
 
 namespace worker
 {
@@ -48,24 +49,23 @@ namespace worker
         incomplete   ///< Task did not complete because of error
     };
 
-    inline const char *as_string(state state_to_convert)
+    inline pybind11::module &bind_worker_state(pybind11::module &module)
     {
-        switch (state_to_convert)
-        {
-        case state::not_started:
-            return "not started";
-        case state::setup:
-            return "setup";
-        case state::working:
-            return "working";
-        case state::teardown:
-            return "teardown";
-        case state::complete:
-            return "complete";
-        case state::incomplete:
-            return "incomplete";
-        }
-        return "unknown";
+        pybind11::enum_<state>(module, "State", pybind11::arithmetic(), R"pbdoc(
+State enumeration for Job() objects.
+)pbdoc")
+            .value("NOT_STARTED", state::not_started,
+                   "Job has not yet been started")
+            .value("SETUP", state::setup,
+                   "Performing Job-specific tasks prior to execution")
+            .value("WORKING", state::working, "Performing Job tasks")
+            .value("TEARDOWN", state::teardown,
+                   "Performing Job-specific tasks after execution")
+            .value("COMPLETE", state::complete,
+                   "Job finished, all Job tasks complete")
+            .value("INCOMPLETE", state::incomplete,
+                   "Job finished, some Job tasks not complete");
+        return module;
     }
 
 } // end namespace worker

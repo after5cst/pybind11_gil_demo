@@ -1,5 +1,3 @@
-#ifndef WORKER_WORKER_H
-#define WORKER_WORKER_H
 // ------------------------------------------------------------------
 // MIT License
 //
@@ -23,40 +21,12 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // ------------------------------------------------------------------
-#include "include_pybind11.h"
-#include "./control.h"
+#include "runnable.h"
 
-namespace worker
-{
-    class runnable;
+// I was getting GCC "RTTI symbol not found for class 'count::runnable'"
+// warnings at runtime until I moved a method out of the header so the
+// compiler could figure out it needed RTTI stuff.  Annoying.
 
-    template <typename INPUT_T, typename OUTPUT_T>
-    struct worker : public control
-    {
-        typedef INPUT_T input_t;
-        typedef std::shared_ptr<OUTPUT_T> output_ptr_t;
-        typedef worker<INPUT_T, OUTPUT_T> worker_t;
+bool worker::runnable::on_setup() { return true; }
 
-        input_t input = {};
-        output_ptr_t output = {};
-
-        // pybind11 helpers to create Python wrapper object.
-        typedef worker container;
-        typedef pybind11::class_<container, std::shared_ptr<container>>
-            shared_class;
-
-        static pybind11::module &bind(pybind11::module &module,
-                                      const char *object_name)
-        {
-            shared_class obj(module, object_name);
-            obj.def(pybind11::init<>());
-            control::bind(obj);
-            obj.def_readonly("input", &container::input);
-            obj.def_readonly("output", &container::output);
-            return module;
-        }
-    };
-
-} // end namespace worker
-
-#endif // WORKER_WORKER_H
+bool worker::runnable::on_teardown() { return true; }

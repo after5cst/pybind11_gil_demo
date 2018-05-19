@@ -28,6 +28,7 @@ include(worker/worker.cmake)
 target_sources( ${PROJECT_NAME}
     PUBLIC
     "init_module.cpp"
+    "count.cpp"
     "count.h"
     "enable_shared_from_this.h"
     "really_async.h"

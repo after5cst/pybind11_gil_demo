@@ -1,5 +1,5 @@
-#ifndef WORKER_INPUT_H
-#define WORKER_INPUT_H
+#ifndef WORKER_LAUNCH_H
+#define WORKER_LAUNCH_H
 // ------------------------------------------------------------------
 // MIT License
 //
@@ -23,33 +23,14 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // ------------------------------------------------------------------
-#include "include_pybind11.h"
-#include "runnable.h"
+#include "./input.h"
 
 namespace worker
 {
-    struct job_data
-    {
-        pybind11::object python_input = {};
-        pybind11::object python_output = {};
-        std::unique_ptr<runnable> runnable_object = {};
-    };
+    pybind11::object launch(worker::input *input);
 
-    ///
-    /// \brief The base input struct
-    ///
-    struct input
-    {
-        virtual ~input() = default;
-        virtual job_data get_job_data() const = 0;
-    };
-
-    inline pybind11::module &bind_worker_input(pybind11::module &module)
-    {
-        pybind11::class_<input> obj(module, "_JobInput");
-        return module;
-    }
+    pybind11::module &bind_worker_launch(pybind11::module &module);
 
 } // end namespace worker
 
-#endif // WORKER_INPUT_H
+#endif // WORKER_LAUNCH_H
