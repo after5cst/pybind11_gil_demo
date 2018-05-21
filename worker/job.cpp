@@ -74,7 +74,7 @@ bool worker::job::wait_for_result(int timeout_in_seconds) const
     switch (get_state())
     {
     case state::not_started:
-        // The thread hasn't started.  This means the Control()
+        // The thread hasn't started.  This means the
         // object is freestanding and probably won't ever be
         // associated with anything.  Technically, it's done
         // but with a failure.
@@ -136,12 +136,14 @@ pybind11::module &worker::bind_worker_job(pybind11::module &module)
 
     obj.def_readonly("input", &job::input,
                      "Copy of job-specific input parameters");
+
     obj.def_readonly(
         "output", &job::output,
         "Job-specific output object.  Updated in real time by Job");
 
     obj.def("wait_for_result", &job::wait_for_result,
-            pybind11::arg("timeout_in_seconds") = -1);
+            pybind11::arg("timeout_in_seconds") = -1,
+            "Wait until the job is completed with timeout value");
 
     obj.def_property_readonly(
         "state", &job::get_state,

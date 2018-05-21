@@ -9,17 +9,48 @@ pybind11::module &count::output::bind(pybind11::module &module)
                                                           "CountOutput");
     obj.def(pybind11::init<>());
     obj.def_property_readonly(
-        "last", [](const output &arg) { return static_cast<int>(arg.last); });
+        "last", [](const output &arg) { return static_cast<int>(arg.last); },
+        "The last number counted by the job thread");
     return module;
 }
 
 pybind11::module &count::input::bind(pybind11::module &module)
 {
-    pybind11::class_<input, worker::input> obj(module, "Count");
+    pybind11::class_<input, worker::input> obj(module, "Count", R"pbdoc(
+Asynchronous C++ job that counts between numbers with a delay.
+
+This is a sample job, but does no useful work.  Not unless you think
+incrementing a counter and sleeping are useful work.
+
+This job does the following thing at each worker state:
+
+SETUP:
+
+  Delay for .delay_ms milliseconds to simulate setup tasks.
+
+WORKING:
+
+  Count from .start to .end (inclusive), delaying for .delay_ms
+  between each step to simulate work.
+
+TEARDOWN:
+
+  Delay for .delay_ms milliseconds to simulate teardown tasks.
+
+If .fail_after is set to State.SETUP, State.WORKING, or State.TEARDOWN,
+then the job will fail at the end of the respective state.
+        )pbdoc");
     obj.def(pybind11::init<>());
-    obj.def_readwrite("start", &input::start);
-    obj.def_readwrite("end", &input::end);
-    obj.def_readwrite("delay_ms", &input::delay_ms);
+    obj.def_readwrite("start", &input::start,
+                      "The number to start counting from (inclusive)");
+    obj.def_readwrite("end", &input::end,
+                      "The final number in the counting sequence(inclusive)");
+    obj.def_readwrite(
+        "delay_ms", &input::delay_ms,
+        "The sleep time in ms to be used in SETUP, WORKING, and TEARDOWN");
+    obj.def_readwrite(
+        "fail_after", &input::fail_after,
+        "If set to SETUP, WORKING, or TEARDOWN, that state will fail.");
     return module;
 }
 
@@ -36,6 +67,13 @@ worker::job_data count::input::get_job_data() const
     return std::move(result);
 }
 
+bool count::runnable::on_setup()
+{
+    // Simulate setup happening.
+    std::this_thread::sleep_for(std::chrono::milliseconds(m_input.delay_ms));
+    return m_input.fail_after != worker::state::setup;
+}
+
 bool count::runnable::on_working(std::atomic_flag &keep_working)
 {
     for (auto i = m_input.start; i <= m_input.end; ++i)
@@ -49,5 +87,12 @@ bool count::runnable::on_working(std::atomic_flag &keep_working)
         std::this_thread::sleep_for(
             std::chrono::milliseconds(m_input.delay_ms));
     }
-    return true;
+    return m_input.fail_after != worker::state::working;
+}
+
+bool count::runnable::on_teardown()
+{
+    // Simulate teardown happening.
+    std::this_thread::sleep_for(std::chrono::milliseconds(m_input.delay_ms));
+    return m_input.fail_after != worker::state::teardown;
 }

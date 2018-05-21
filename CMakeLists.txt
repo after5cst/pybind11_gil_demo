@@ -14,7 +14,6 @@ include(cmake_helpers/helpers.cmake)
 # to the include path.  This allows relative includes from
 # base to be used.
 include_directories(${CMAKE_CURRENT_LIST_DIR})
-#include(inc/inc.cmake)
 
 #----------------------------------------------------------
 # Step 3: Add reusable sources and subdirectories.
@@ -30,9 +29,8 @@ target_sources( ${PROJECT_NAME}
     "init_module.cpp"
     "count.cpp"
     "count.h"
-    "enable_shared_from_this.h"
+    # "enable_shared_from_this.h"
     "really_async.h"
-    "worker.h"
     )
 
 AddClangFormat(${PROJECT_NAME})

@@ -17,9 +17,10 @@ namespace count
 
     struct input : public worker::input
     {
-        int start = 0;
+        int start = 1;
         int end = 100;
         int delay_ms = 1000;
+        worker::state fail_after = worker::state::incomplete;
 
         virtual worker::job_data get_job_data() const override;
         static pybind11::module &bind(pybind11::module &module);
@@ -33,7 +34,9 @@ namespace count
         {
         }
 
+        virtual bool on_setup() override;
         virtual bool on_working(std::atomic_flag &keep_working) override;
+        virtual bool on_teardown() override;
 
     private:
         input m_input;

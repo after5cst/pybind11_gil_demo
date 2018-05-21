@@ -4,4 +4,5 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
 #include "pybind11/include/pybind11/pybind11.h"
+#include "pybind11/include/pybind11/chrono.h"
 #pragma GCC diagnostic pop

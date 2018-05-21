@@ -1,5 +1,6 @@
 #ifndef ENABLE_SHARED_FROM_THIS_H
 #define ENABLE_SHARED_FROM_THIS_H
+#error THIS FILE NOT CURRENTLY USED.
 #include <memory>
 
 #pragma GCC diagnostic push

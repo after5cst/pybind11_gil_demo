@@ -28,6 +28,34 @@
 
 namespace
 {
+    class set_timestamp_at_scope_exit
+    {
+    public:
+        set_timestamp_at_scope_exit(worker::job::time_point_t &time)
+            : m_time(time)
+        {
+        }
+        ~set_timestamp_at_scope_exit() { m_time = worker::job::clock_t::now(); }
+
+        // Delete copy constructor
+        set_timestamp_at_scope_exit(const set_timestamp_at_scope_exit &rhs) =
+            delete;
+
+        // Delete move constructor
+        set_timestamp_at_scope_exit(set_timestamp_at_scope_exit &&rhs) = delete;
+
+        // Delete copy assignment
+        set_timestamp_at_scope_exit
+        operator=(const set_timestamp_at_scope_exit &rhs) = delete;
+
+        // Delete move assignment
+        set_timestamp_at_scope_exit
+        operator=(set_timestamp_at_scope_exit &&rhs) = delete;
+
+    private:
+        worker::job::time_point_t &m_time;
+    };
+
     void run_job(std::unique_ptr<worker::runnable> runnable,
                  worker::job::control_ptr_t control)
     {
@@ -47,6 +75,8 @@ namespace
             if (success)
             {
                 control->state = worker::state::working;
+                control->start_working = worker::job::clock_t::now();
+                set_timestamp_at_scope_exit end_working(control->end_working);
                 success = runnable->on_working(control->keep_working);
             }
         }
@@ -98,6 +128,25 @@ pybind11::object worker::launch(worker::input *input)
     job->output = std::move(job_data.python_output);
     job->future = really_async(run_job, std::move(job_data.runnable_object),
                                job->control);
+
+    auto retries = 0;
+    const auto MAX_RETRIES = 100;
+    do
+    {
+        if (worker::state::not_started == job->get_state())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        else
+        {
+            // The worker has started.  We're done waiting.
+            break;
+        }
+    } while (++retries < MAX_RETRIES);
+    if (MAX_RETRIES == retries)
+    {
+        throw std::runtime_error("Launched thread did not start");
+    }
 
     return pybind11::cast(job.release());
 }
