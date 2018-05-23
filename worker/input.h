@@ -42,11 +42,15 @@ namespace worker
     {
         virtual ~input() = default;
         virtual job_data get_job_data() const = 0;
+        virtual std::string get_str() const = 0;
+        virtual std::string get_repr() const = 0;
     };
 
     inline pybind11::module &bind_worker_input(pybind11::module &module)
     {
         pybind11::class_<input> obj(module, "_JobInput");
+        obj.def("__repr__", &input::get_repr);
+        obj.def("__str__", &input::get_str);
         return module;
     }
 

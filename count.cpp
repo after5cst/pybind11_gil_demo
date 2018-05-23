@@ -1,6 +1,7 @@
 #include "count.h"
 
 #include <chrono>
+#include <sstream>
 #include <thread>
 
 pybind11::module &count::output::bind(pybind11::module &module)
@@ -40,7 +41,8 @@ TEARDOWN:
 If .fail_after is set to State.SETUP, State.WORKING, or State.TEARDOWN,
 then the job will fail at the end of the respective state.
         )pbdoc");
-    obj.def(pybind11::init<>());
+    obj.def(pybind11::init<int, int, int>(), pybind11::arg("start") = 1,
+            pybind11::arg("end") = 100, pybind11::arg("delay_ms") = 1000);
     obj.def_readwrite("start", &input::start,
                       "The number to start counting from (inclusive)");
     obj.def_readwrite("end", &input::end,
@@ -65,6 +67,19 @@ worker::job_data count::input::get_job_data() const
     result.python_output = pybind11::cast(output_data);
     result.runnable_object = std::move(runnable_object);
     return std::move(result);
+}
+
+std::string count::input::get_repr() const
+{
+    return std::string("Count") + get_str();
+}
+
+std::string count::input::get_str() const
+{
+    std::stringstream sstr;
+    sstr << "(start=" << start << ", end=" << end << ", delay_ms=" << delay_ms
+         << ")";
+    return std::move(sstr.str());
 }
 
 bool count::runnable::on_setup()

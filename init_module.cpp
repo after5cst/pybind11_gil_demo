@@ -1,7 +1,6 @@
 #include "count.h"
 #include "really_async.h"
-#include "worker/launch.h"
-#include "worker/job.h"
+#include "worker/init_worker.h"
 
 #include <chrono>
 #include <iostream>
@@ -73,11 +72,7 @@ Returns
 None
 )pbdoc");
 
-    worker::bind_worker_input(module);
-    worker::bind_worker_job(module);
-    worker::bind_worker_launch(module);
-    worker::bind_worker_state(module);
-
+    worker::init_worker(module);
     count::input::bind(module);
     count::output::bind(module);
 }

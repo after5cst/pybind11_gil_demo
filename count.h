@@ -17,12 +17,20 @@ namespace count
 
     struct input : public worker::input
     {
-        int start = 1;
-        int end = 100;
-        int delay_ms = 1000;
+        input(int start_, int end_, int delay_ms_)
+            : start(start_), end(end_), delay_ms(delay_ms_)
+        {
+        }
+
+        int start;
+        int end;
+        int delay_ms;
+
         worker::state fail_after = worker::state::incomplete;
 
         virtual worker::job_data get_job_data() const override;
+        virtual std::string get_repr() const override;
+        virtual std::string get_str() const override;
         static pybind11::module &bind(pybind11::module &module);
     };
 
